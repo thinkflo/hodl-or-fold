@@ -129,13 +129,14 @@
         <!-- Idle prompt -->
         {#if $phase === 'idle'}
           <div class="idle-section">
-            <div class="idle-cta">Up or down in 60 seconds?</div>
+            <div class="idle-cta">The HODL or FOLD Game!</div>
           </div>
         {/if}
 
         <!-- Action bar -->
         <div class="actions">
           {#if $phase === 'idle'}
+            <h2>Guess if BTC goes up or down in the next 60 seconds?</h2>
             <button
               class="btn btn-up"
               disabled={submitting}
@@ -258,7 +259,7 @@
   /* ── Score ───────────────────────────────────────────────────────────────── */
   .score-badge {
     text-align: center; margin-top: 14px;
-    font-size: 10px; letter-spacing: 0.2em; color: #333;
+    font-size: 16px; color: #333;
   }
   .score-badge span { margin-left: 6px; font-weight: 700; color: #555; }
   .score-badge .positive { color: #00ff88; }
