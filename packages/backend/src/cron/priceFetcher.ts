@@ -1,5 +1,5 @@
 // packages/backend/src/cron/priceFetcher.ts
-// Fetches BTC/USD price every ~1s and writes to D1 (price_feed table).
+// Fetches BTC/USD price every ~2s (30 iterations) and writes to D1 (price_feed table).
 // Price sources tried in order: Kraken → Binance → CoinGecko
 // All responses are fully consumed to avoid Workers fetch deadlock.
 
@@ -65,8 +65,11 @@ async function fetchBtcPrice(): Promise<number> {
   throw new Error('All price sources failed');
 }
 
+const CRON_ITERATIONS = 30;
+const CRON_INTERVAL_MS = 2000;
+
 export async function runPriceFetcher(env: Env): Promise<void> {
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < CRON_ITERATIONS; i++) {
     try {
       const price = await fetchBtcPrice();
       await setPriceInDb(env.DB, {
@@ -78,6 +81,6 @@ export async function runPriceFetcher(env: Env): Promise<void> {
       console.error(`Price fetch iteration ${i} failed:`, e);
     }
 
-    if (i < 59) await new Promise(r => setTimeout(r, 1000));
+    if (i < CRON_ITERATIONS - 1) await new Promise(r => setTimeout(r, CRON_INTERVAL_MS));
   }
 }

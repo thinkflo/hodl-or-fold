@@ -2,8 +2,8 @@
 // GET /price/stream — Server-Sent Events feed of live BTC/USD price.
 //
 // Each connected client gets its own independent stream. The Worker reads D1
-// (price_feed) once per second and pushes the value down the connection.
-// D1 gives read-after-write consistency so clients see updates within ~1s.
+// (price_feed) every 2 seconds and pushes the value down the connection.
+// D1 gives read-after-write consistency so clients see updates within ~2s.
 //
 // Native EventSource in the browser auto-reconnects on drop; no client-side
 // reconnect logic is required.
@@ -14,7 +14,7 @@ import type { Env } from '../db/client';
 import type { PricePayload } from '@hodl-or-fold/shared';
 import { getPriceFromDb } from '../db/price';
 
-const POLL_INTERVAL_MS = 1000;
+const POLL_INTERVAL_MS = 2000;
 
 export async function priceStream(_request: Request, env: Env): Promise<Response> {
   const { readable, writable } = new TransformStream();
