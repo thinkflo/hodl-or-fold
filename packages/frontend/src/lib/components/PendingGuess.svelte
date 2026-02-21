@@ -37,11 +37,13 @@
   $: ringColor = $secondsLeft > 30 ? '#00ff88' : $secondsLeft > 10 ? '#ffcc00' : '#ff4466';
   $: ringDash  = `${(RING_CIRC * ($secondsLeft / ROUND_SECS)).toFixed(2)} ${RING_CIRC}`;
 
-  $: standingText = $phase === 'waiting'    ? '⏳ Waiting for price to move…'
+  $: standingText = $phase === 'validating' ? 'Validating results…'
+                  : $phase === 'waiting'     ? 'Waiting for price to move…'
                   : $standing === 'winning' ? '✓ Currently winning'
                   : $standing === 'losing'  ? '✗ Currently losing'
                   : '— Price at entry';
-  $: standingColor = $standing === 'winning' ? '#00ff88'
+  $: standingColor = $phase === 'validating' ? '#888'
+                   : $standing === 'winning' ? '#00ff88'
                    : $standing === 'losing'  ? '#ff4466' : '#555';
 
   let prevLive = 0;
@@ -296,7 +298,9 @@
       </svg>
       <div class="ring-center">
         {#if $phase === 'waiting'}
-          <div class="waiting-label">WAITING<br>FOR MOVE</div>
+          <span class="ring-emoji" aria-hidden="true">⏳</span>
+        {:else if $phase === 'validating'}
+          <div class="validating-label">Validating…</div>
         {:else}
           <div class="countdown" style:color={$secondsLeft <= 10 ? '#ff4466' : '#fff'}>
             {$secondsLeft}
@@ -352,9 +356,12 @@
     font-variant-numeric: tabular-nums; text-align: center;
     transition: color 0.5s;
   }
-  .waiting-label {
-    font-size: 9px; color: #555; text-align: center;
-    letter-spacing: 0.1em; line-height: 1.6;
+  .ring-emoji {
+    font-size: 48px; line-height: 1; user-select: none;
+  }
+  .validating-label {
+    font-size: 11px; color: #888; text-align: center;
+    letter-spacing: 0.08em;
   }
   .status-right { flex: 1; min-width: 0; }
   .label-micro  { font-size: 9px; color: #444; letter-spacing: 0.2em; margin-bottom: 3px; }

@@ -12,7 +12,7 @@ import type {
 } from '$lib/types';
 
 // ── Phase ─────────────────────────────────────────────────────────────────────
-export type Phase = 'idle' | 'guessing' | 'waiting' | 'resolved';
+export type Phase = 'idle' | 'guessing' | 'waiting' | 'validating' | 'resolved';
 
 export interface Resolution {
   outcome:    GuessOutcome;
@@ -194,6 +194,7 @@ async function checkResolution(newPrice: number): Promise<void> {
   if (!pendingGuess) return;
   const $phase = get(phase);
   if ($phase === 'idle' || $phase === 'resolved') return;
+  // 'validating' and 'waiting' both allow resolution check
 
   const elapsed    = (Date.now() - pendingGuess.guessedAt) / 1000;
   const timerDone  = elapsed >= 60;
@@ -235,7 +236,13 @@ function startCountdown(): void {
     secondsLeft.set(remaining);
     if (remaining <= 0) {
       stopCountdown();
-      if (get(phase) === 'guessing') phase.set('waiting');
+      if (get(phase) === 'guessing') {
+        const currentPrice = get(price);
+        const entry = g.priceAtGuess;
+        const priceMoved = entry !== undefined && currentPrice !== undefined
+          && Math.abs(currentPrice - entry) >= 0.01;
+        phase.set(priceMoved ? 'validating' : 'waiting');
+      }
     }
   }, 1000);
 }
