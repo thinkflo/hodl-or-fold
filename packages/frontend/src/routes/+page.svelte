@@ -182,6 +182,8 @@
     color: #fff;
   }
 
+  h2 { font-size: 1.3em}
+
   main  { width: 100%; }
   .app  { width: 100%; max-width: 420px; margin: 0 auto; }
 
