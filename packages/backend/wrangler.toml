@@ -1,0 +1,14 @@
+name               = "hodl-or-fold-api"
+main               = "src/index.ts"
+compatibility_date = "2026-01-01"
+
+# Fires every minute. The handler loops internally at ~1s intervals
+# to achieve per-second price updates within a single invocation.
+# Workers Paid plan provides a 15-minute wall-clock budget for cron handlers.
+[triggers]
+crons = ["* * * * *"]
+
+[[d1_databases]]
+binding       = "DB"
+database_name = "hodl-or-fold-db"
+database_id   = "15be9b48-3346-42d0-9ad3-bca5e723c8ac"

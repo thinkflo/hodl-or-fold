@@ -1,0 +1,22 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Wrangler (Cloudflare local/cache)
+.wrangler
+
+# SvelteKit
+.svelte-kit
+build
+
+# Env and secrets
+.env
+.env.*
+!.env.example
+
+# Logs and OS
+*.log
+.DS_Store
+
+# Test / coverage
+coverage

@@ -1,0 +1,11 @@
+{
+  "name": "hodl-or-fold",
+  "private": true,
+  "scripts": {
+    "dev:backend":     "pnpm --filter backend dev",
+    "dev:frontend":    "pnpm --filter frontend dev",
+    "deploy:backend":  "pnpm --filter backend deploy",
+    "deploy:frontend": "pnpm --filter frontend deploy",
+    "test":            "pnpm --filter backend test"
+  }
+}

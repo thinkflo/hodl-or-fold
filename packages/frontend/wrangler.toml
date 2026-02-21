@@ -1,0 +1,6 @@
+name = "hodl-or-fold"
+pages_build_output_dir = ".svelte-kit/cloudflare"
+
+# Set via Cloudflare dashboard — never committed to source control
+# API_SECRET must match the secret set in the backend Worker
+# WORKER_URL is the deployed backend Worker URL
