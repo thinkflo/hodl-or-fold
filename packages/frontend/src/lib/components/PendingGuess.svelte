@@ -80,6 +80,12 @@
     return diff >= 0.01 ? '#00ff88' : diff <= -0.01 ? '#ff4466' : '#888888';
   }
 
+  /** Pre-format a price for the Y-axis label. */
+  const fmtAxis = (n: number) => '$' + n.toFixed(2);
+
+  let lastDrawTime = 0;
+  const DRAW_INTERVAL = 50; // ~20fps — plenty for a 60s chart
+
   function draw(now: number): void {
     if (!canvas) return;
 
@@ -91,7 +97,7 @@
     const ctx = canvas.getContext('2d');
     if (!ctx || !canvas.width || !canvas.height) return;
 
-    const ep  = chartEntry; // fixed at round start so entry line never becomes "price at 60s"
+    const ep  = chartEntry;
     const col = chartColor();
     const dpr = devicePixelRatio;
     const pl  = 10 * dpr; const pt = 10 * dpr; const pb = 8 * dpr;
@@ -102,48 +108,52 @@
 
     if (!chartEntry || dispPrice === 0) return;
 
-    // Use server round start when available (e.g. after refresh) so chart position and backfill are correct
     const elapsed = $roundStartMs
       ? (Date.now() - $roundStartMs) / 1000
       : (now - roundStart) / 1000;
     const elapsedClamped = Math.min(elapsed, ROUND_SECS);
-    // When round ended (frozen), always show tip at 60s so line doesn't jump backward
-    // (after resolve we clear roundStartMs, so elapsed would otherwise use mount time)
     const effectiveElapsed = frozen ? ROUND_SECS : elapsedClamped;
 
-    // Minimal Y scale ($0.10), expand-only as price moves
-    const allPrices = history.length ? [...history, dispPrice, ep] : [dispPrice, ep]; // ep = chartEntry
-    const padding = 0.05; // ±5¢ so axis starts tight
-    const tMin = Math.min(...allPrices) - padding;
-    const tMax = Math.max(...allPrices) + padding;
+    // Expand-only Y scale — loop instead of spreading arrays every frame
+    let tMin = Math.min(dispPrice, ep);
+    let tMax = Math.max(dispPrice, ep);
+    for (let i = 0; i < history.length; i++) {
+      const p = history[i];
+      if (p < tMin) tMin = p;
+      if (p > tMax) tMax = p;
+    }
+    tMin -= 0.05;
+    tMax += 0.05;
     if (tMin < smoothMin) smoothMin = tMin;
     if (tMax > smoothMax) smoothMax = tMax;
     const dataRange = smoothMax - smoothMin || 1;
-    const minRange = 0.10; // $0.10 minimum scale, then auto-grow
+    const minRange = 0.10;
     const range = Math.max(dataRange, minRange);
     const drawMin = (smoothMin + smoothMax) / 2 - range / 2;
-    const drawMax = drawMin + range;
 
     const tipX = pl + (effectiveElapsed / ROUND_SECS) * cw;
     const toX  = (i: number) => pl + (i / ROUND_SECS) * cw;
     const toY  = (p: number) => pt + ch - ((p - drawMin) / range) * ch;
 
-    // One point per elapsed second; store price only so line reacts to scale changes.
-    // After refresh we have no real history: backfill with entry price so the segment 0..now
-    // is flat at entry and the tip shows current price (so the move is visible).
+    // Add history points — push in place instead of re-spreading the array
     const targetCount = Math.floor(effectiveElapsed);
-    const isBackfilling = history.length === 0 && targetCount > 0;
-    const priceForNewPoint = isBackfilling ? chartEntry : dispPrice;
-    while (history.length < targetCount) {
-      history = [...history, priceForNewPoint];
+    if (history.length < targetCount) {
+      const isBackfilling = history.length === 0 && targetCount > 0;
+      const fillPrice = isBackfilling ? chartEntry : dispPrice;
+      while (history.length < targetCount) history.push(fillPrice);
     }
 
-    // Y from current scale every frame so the line moves with the scale
-    const pts: [number, number][] = [
-      [toX(0), toY(ep)],
-      ...history.map((price, i) => [toX(i + 1), toY(price)] as [number, number]),
-      [tipX, toY(dispPrice)],
-    ];
+    // Build coordinate array — reuse a flat working buffer
+    const ptCount = history.length + 2;
+    const ptsX = new Float64Array(ptCount);
+    const ptsY = new Float64Array(ptCount);
+    ptsX[0] = toX(0); ptsY[0] = toY(ep);
+    for (let i = 0; i < history.length; i++) {
+      ptsX[i + 1] = toX(i + 1);
+      ptsY[i + 1] = toY(history[i]);
+    }
+    ptsX[ptCount - 1] = tipX;
+    ptsY[ptCount - 1] = toY(dispPrice);
 
     // Grid
     const rawStep   = range / 4;
@@ -169,7 +179,7 @@
       ctx.font = `${9 * dpr}px Inter, sans-serif`;
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
-      ctx.fillText('$' + p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }), pl + cw - 2 * dpr, y);
+      ctx.fillText(fmtAxis(p), pl + cw - 2 * dpr, y);
     }
     ctx.restore();
 
@@ -192,30 +202,32 @@
     ctx.fillText('ENTRY', pl + cw - 2 * dpr, ey - 7 * dpr);
     ctx.restore();
 
-    if (pts.length < 2) return;
+    if (ptCount < 2) return;
 
     function spline(): void {
       ctx.beginPath();
-      ctx.moveTo(pts[0][0], pts[0][1]);
-      for (let i = 0; i < pts.length - 1; i++) {
-        const a = pts[Math.max(0, i - 1)];
-        const b = pts[i];
-        const c = pts[i + 1];
-        const d = pts[Math.min(pts.length - 1, i + 2)];
+      ctx.moveTo(ptsX[0], ptsY[0]);
+      for (let i = 0; i < ptCount - 1; i++) {
+        const ai = Math.max(0, i - 1);
+        const di = Math.min(ptCount - 1, i + 2);
         ctx.bezierCurveTo(
-          b[0] + (c[0] - a[0]) / 6, b[1] + (c[1] - a[1]) / 6,
-          c[0] - (d[0] - b[0]) / 6, c[1] - (d[1] - b[1]) / 6,
-          c[0], c[1]
+          ptsX[i] + (ptsX[i + 1] - ptsX[ai]) / 6,
+          ptsY[i] + (ptsY[i + 1] - ptsY[ai]) / 6,
+          ptsX[i + 1] - (ptsX[di] - ptsX[i]) / 6,
+          ptsY[i + 1] - (ptsY[di] - ptsY[i]) / 6,
+          ptsX[i + 1], ptsY[i + 1]
         );
       }
     }
 
-    const last = pts[pts.length - 1];
+    const lastX = ptsX[ptCount - 1];
+    const lastY = ptsY[ptCount - 1];
 
+    // Gradient fill — no shadow
     ctx.save();
     spline();
-    ctx.lineTo(last[0], pt + ch);
-    ctx.lineTo(pts[0][0], pt + ch);
+    ctx.lineTo(lastX, pt + ch);
+    ctx.lineTo(ptsX[0], pt + ch);
     ctx.closePath();
     const grad = ctx.createLinearGradient(0, pt, 0, pt + ch);
     grad.addColorStop(0, col + '28');
@@ -224,28 +236,34 @@
     ctx.fill();
     ctx.restore();
 
+    // Line stroke — no shadow (shadow on strokes is the biggest perf killer)
     ctx.save();
     spline();
     ctx.strokeStyle = col;
     ctx.lineWidth = 2 * dpr;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-    ctx.shadowColor = col;
-    ctx.shadowBlur = 6 * dpr;
     ctx.stroke();
     ctx.restore();
 
+    // Tip dot — keep a small glow here only
     ctx.save();
     ctx.fillStyle = col;
     ctx.shadowColor = col;
-    ctx.shadowBlur = 10 * dpr;
+    ctx.shadowBlur = 8 * dpr;
     ctx.beginPath();
-    ctx.arc(last[0], last[1], 4 * dpr, 0, Math.PI * 2);
+    ctx.arc(lastX, lastY, 4 * dpr, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
 
   function rafLoop(now: number): void {
+    // Throttle: skip frames if we drew recently
+    if (!frozen && now - lastDrawTime < DRAW_INTERVAL) {
+      rafId = requestAnimationFrame(rafLoop);
+      return;
+    }
+    lastDrawTime = now;
     draw(now);
     if (!frozen) rafId = requestAnimationFrame(rafLoop);
     else draw(performance.now());
