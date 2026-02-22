@@ -3,7 +3,7 @@
 <script lang="ts">
   import { onMount, onDestroy, tick } from 'svelte';
   import {
-    phase, score, resolution, price,
+    phase, score, resolution, price, direction,
     initGame, resetGame, connectPriceFeed, submitGuess,
   } from '$lib/stores/game';
   import { flipPrice } from '$lib/utils/priceAnimation';
@@ -129,13 +129,9 @@
         <!-- Idle prompt -->
         {#if $phase === 'idle'}
           <div class="idle-section">
-            <div class="idle-cta">The HODL or FOLD Game!</div>
+            <div class="idle-cta">Will BTC rise or fall?</div>
+            <div class="idle-sub">Make your call. 60 seconds.</div>
           </div>
-        {/if}
-
-        <!-- Action bar -->
-        {#if $phase === 'idle'}
-        <h2>Guess if BTC goes up or down in the next 60 seconds?</h2>
         {/if}
         <div class="actions">
           {#if $phase === 'idle'}
@@ -143,16 +139,31 @@
               class="btn btn-up"
               disabled={submitting}
               on:click={() => handleGuess('up')}
-            >▲ HODL</button>
+            >
+              <span class="btn-label">▲ HODL</span>
+              <span class="btn-hint">Price goes up</span>
+            </button>
             <button
               class="btn btn-down"
               disabled={submitting}
               on:click={() => handleGuess('down')}
-            >▼ FOLD</button>
+            >
+              <span class="btn-label">▼ FOLD</span>
+              <span class="btn-hint">Price goes down</span>
+            </button>
           {:else if $phase === 'resolved'}
-            <button class="btn btn-reset" on:click={handleReset}>PLAY AGAIN</button>
+            <button class="btn btn-reset" on:click={handleReset}>
+              <span class="btn-label">PLAY AGAIN</span>
+              <span class="btn-hint">Double or nothing</span>
+            </button>
           {:else}
-            <div class="in-progress">ROUND IN PROGRESS</div>
+            <div class="in-progress">
+              You called
+              <span style:color={$direction === 'up' ? '#00ff88' : '#ff4466'}>
+                {$direction === 'up' ? '▲ HODL' : '▼ FOLD'}
+              </span>
+              — watching the market…
+            </div>
           {/if}
         </div>
 
@@ -183,8 +194,6 @@
     padding: 20px;
     color: #fff;
   }
-
-  h2 { font-size: 1.3em}
 
   main  { width: 100%; }
   .app  { width: 100%; max-width: 420px; margin: 0 auto; }
@@ -224,54 +233,92 @@
   .result-call   { font-size: 12px; color: #333; margin-top: 4px; }
 
   /* ── Idle ────────────────────────────────────────────────────────────────── */
-  .idle-section { padding: 20px 24px 16px; text-align: center; }
-  .idle-cta     { font-size: 15px; font-weight: 500; color: #666; }
-
-  h2 {
-    padding: 0px 20px 0px;
+  .idle-section { padding: 24px 24px 8px; text-align: center; }
+  .idle-cta {
+    font-size: 20px; font-weight: 600; color: #ccc;
+    letter-spacing: -0.01em;
+  }
+  .idle-sub {
+    font-size: 13px; color: #555; margin-top: 6px;
+    letter-spacing: 0.05em;
   }
 
   /* ── Actions ─────────────────────────────────────────────────────────────── */
   .actions {
-    padding: 14px 20px 20px;
+    padding: 16px 20px 22px;
     display: flex;
     gap: 12px;
   }
   .btn {
-    flex: 1; padding: 15px 8px; border-radius: 10px;
-    font-family: inherit; font-size: 14px; font-weight: 700;
-    letter-spacing: 0.05em; cursor: pointer; border: 1px solid;
-    transition: background 0.2s, transform 0.1s;
+    flex: 1; padding: 20px 8px; border-radius: 12px;
+    font-family: inherit; font-weight: 700;
+    letter-spacing: 0.05em; cursor: pointer; border: 1.5px solid;
+    transition: background 0.2s, border-color 0.2s, box-shadow 0.3s, transform 0.1s;
     -webkit-tap-highlight-color: transparent;
     user-select: none; touch-action: manipulation;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
   }
   .btn:active { transform: scale(0.97); }
   .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-label { font-size: 18px; }
+  .btn-hint  { font-size: 10px; font-weight: 400; opacity: 0.5; letter-spacing: 0.08em; }
 
-  .btn-up   { background: rgba(0,255,136,.08); border-color: rgba(0,255,136,.25); color: #00ff88; }
-  .btn-up:hover:not(:disabled)   { background: rgba(0,255,136,.18); }
-  .btn-down { background: rgba(255,68,102,.08); border-color: rgba(255,68,102,.25); color: #ff4466; }
-  .btn-down:hover:not(:disabled) { background: rgba(255,68,102,.18); }
-  .btn-reset {
-    background: rgba(255,255,255,.05);
-    border-color: rgba(255,255,255,.1);
-    color: #888;
+  .btn-up {
+    background: rgba(0,255,136,.12); border-color: rgba(0,255,136,.4); color: #00ff88;
+    animation: pulse-up 2.5s ease-in-out infinite;
   }
-  .btn-reset:hover { background: rgba(255,255,255,.1); color: #aaa; }
+  .btn-up:hover:not(:disabled) {
+    background: rgba(0,255,136,.22); border-color: rgba(0,255,136,.6);
+    box-shadow: 0 0 24px rgba(0,255,136,.2);
+  }
+  .btn-down {
+    background: rgba(255,68,102,.12); border-color: rgba(255,68,102,.4); color: #ff4466;
+    animation: pulse-down 2.5s ease-in-out infinite;
+  }
+  .btn-down:hover:not(:disabled) {
+    background: rgba(255,68,102,.22); border-color: rgba(255,68,102,.6);
+    box-shadow: 0 0 24px rgba(255,68,102,.2);
+  }
+
+  @keyframes pulse-up {
+    0%, 100% { box-shadow: 0 0 0 rgba(0,255,136,0); }
+    50%      { box-shadow: 0 0 18px rgba(0,255,136,.15); }
+  }
+  @keyframes pulse-down {
+    0%, 100% { box-shadow: 0 0 0 rgba(255,68,102,0); }
+    50%      { box-shadow: 0 0 18px rgba(255,68,102,.15); }
+  }
+
+  .btn-reset {
+    background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.2); color: #ddd;
+    animation: pulse-reset 2s ease-in-out infinite;
+  }
+  .btn-reset:hover {
+    background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.35); color: #fff;
+    box-shadow: 0 0 20px rgba(255,255,255,.1);
+  }
+  @keyframes pulse-reset {
+    0%, 100% { box-shadow: 0 0 0 rgba(255,255,255,0); }
+    50%      { box-shadow: 0 0 14px rgba(255,255,255,.08); }
+  }
 
   .in-progress {
     flex: 1; padding: 15px 8px; text-align: center;
-    color: #2a2a2a; font-size: 11px; letter-spacing: 0.15em;
+    color: #666; font-size: 12px; letter-spacing: 0.06em;
   }
 
   /* ── Score ───────────────────────────────────────────────────────────────── */
   .score-badge {
-    text-align: center; margin-top: 14px;
-    font-size: 16px; color: #333;
+    text-align: center; margin-top: 16px;
+    font-size: 12px; color: #555; letter-spacing: 0.2em;
   }
-  .score-badge span { margin-left: 6px; font-weight: 700; color: #555; }
-  .score-badge .positive { color: #00ff88; }
-  .score-badge .negative { color: #ff4466; }
+  .score-badge span {
+    display: block; margin-top: 2px;
+    font-size: 22px; font-weight: 700; color: #fff;
+    letter-spacing: -0.02em;
+  }
+  .score-badge .positive { color: #00ff88; filter: drop-shadow(0 0 8px rgba(0,255,136,.3)); }
+  .score-badge .negative { color: #ff4466; filter: drop-shadow(0 0 8px rgba(255,68,102,.3)); }
 
   .footer {
     text-align: center; margin-top: 18px;
