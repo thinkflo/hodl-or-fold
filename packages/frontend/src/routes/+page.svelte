@@ -134,9 +134,11 @@
         {/if}
 
         <!-- Action bar -->
+        {#if $phase === 'idle'}
+        <h2>Guess if BTC goes up or down in the next 60 seconds?</h2>
+        {/if}
         <div class="actions">
           {#if $phase === 'idle'}
-            <h2>Guess if BTC goes up or down in the next 60 seconds?</h2>
             <button
               class="btn btn-up"
               disabled={submitting}
@@ -189,7 +191,7 @@
 
   .top-label {
     font-size: 10px; letter-spacing: 0.3em; color: #444;
-    text-align: center; margin-bottom: 8px;
+    text-align: center; margin: 8px auto;
   }
 
   .card {
@@ -224,6 +226,10 @@
   /* ── Idle ────────────────────────────────────────────────────────────────── */
   .idle-section { padding: 20px 24px 16px; text-align: center; }
   .idle-cta     { font-size: 15px; font-weight: 500; color: #666; }
+
+  h2 {
+    padding: 0px 20px 0px;
+  }
 
   /* ── Actions ─────────────────────────────────────────────────────────────── */
   .actions {

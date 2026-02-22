@@ -36,6 +36,8 @@
 
   $: ringColor = $secondsLeft > 30 ? '#00ff88' : $secondsLeft > 10 ? '#ffcc00' : '#ff4466';
   $: ringDash  = `${(RING_CIRC * ($secondsLeft / ROUND_SECS)).toFixed(2)} ${RING_CIRC}`;
+  /** Use butt when empty so we don't show a round cap dot at 0 (waiting/validating). */
+  $: ringLinecap = $secondsLeft > 0 ? 'round' : 'butt';
 
   $: standingText = $phase === 'validating' ? 'Validating results…'
                   : $phase === 'waiting'     ? 'Waiting for price to move…'
@@ -105,6 +107,9 @@
       ? (Date.now() - $roundStartMs) / 1000
       : (now - roundStart) / 1000;
     const elapsedClamped = Math.min(elapsed, ROUND_SECS);
+    // When round ended (frozen), always show tip at 60s so line doesn't jump backward
+    // (after resolve we clear roundStartMs, so elapsed would otherwise use mount time)
+    const effectiveElapsed = frozen ? ROUND_SECS : elapsedClamped;
 
     // Minimal Y scale ($0.10), expand-only as price moves
     const allPrices = history.length ? [...history, dispPrice, ep] : [dispPrice, ep]; // ep = chartEntry
@@ -119,14 +124,14 @@
     const drawMin = (smoothMin + smoothMax) / 2 - range / 2;
     const drawMax = drawMin + range;
 
-    const tipX = pl + (Math.min(elapsedClamped, ROUND_SECS) / ROUND_SECS) * cw;
+    const tipX = pl + (effectiveElapsed / ROUND_SECS) * cw;
     const toX  = (i: number) => pl + (i / ROUND_SECS) * cw;
     const toY  = (p: number) => pt + ch - ((p - drawMin) / range) * ch;
 
     // One point per elapsed second; store price only so line reacts to scale changes.
     // After refresh we have no real history: backfill with entry price so the segment 0..now
     // is flat at entry and the tip shows current price (so the move is visible).
-    const targetCount = Math.floor(elapsedClamped);
+    const targetCount = Math.floor(effectiveElapsed);
     const isBackfilling = history.length === 0 && targetCount > 0;
     const priceForNewPoint = isBackfilling ? chartEntry : dispPrice;
     while (history.length < targetCount) {
@@ -290,7 +295,7 @@
         <circle cx="56" cy="56" r={RING_R} fill="none" stroke="rgba(255,255,255,.06)" stroke-width="6"/>
         <circle
           cx="56" cy="56" r={RING_R}
-          fill="none" stroke={ringColor} stroke-width="6" stroke-linecap="round"
+          fill="none" stroke={ringColor} stroke-width="6" stroke-linecap={ringLinecap}
           stroke-dasharray={ringDash}
           style="filter:drop-shadow(0 0 8px {ringColor}88);
                  transition:stroke-dasharray .95s cubic-bezier(.4,0,.2,1),stroke .5s ease"

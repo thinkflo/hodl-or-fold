@@ -77,7 +77,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 4px;
+    margin-bottom: 16px;
   }
   .price {
     font-size: clamp(32px, 9vw, 44px);
