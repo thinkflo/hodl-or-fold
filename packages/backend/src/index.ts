@@ -15,6 +15,7 @@ import { priceStream }      from './handlers/price-stream';
 import { createOrUpdatePlayer, getPlayer } from './handlers/players';
 import { createGuess, getGuessStatus }     from './handlers/guesses';
 import { runPriceFetcher }  from './cron/priceFetcher';
+import { ScheduledEvent } from '@cloudflare/workers-types';
 
 // Replace with your Pages deployment origin in production
 const ALLOWED_ORIGIN = 'https://hodl-or-fold.pages.dev';
