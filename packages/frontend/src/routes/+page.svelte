@@ -9,7 +9,6 @@
   import { flipPrice } from '$lib/utils/priceAnimation';
   import PriceDisplay   from '$lib/components/PriceDisplay.svelte';
   import PendingGuess   from '$lib/components/PendingGuess.svelte';
-  import GuessButtons   from '$lib/components/GuessButtons.svelte';
   import CapacityScreen from '$lib/components/CapacityScreen.svelte';
 
   export let data: import('./$types').PageData;

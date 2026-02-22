@@ -9,7 +9,7 @@ import { writable, derived, get } from 'svelte/store';
 import type {
   Direction, GuessOutcome, PricePayload,
   PlayerResponse, CreateGuessResponse, GuessStatusResponse, Guess,
-} from '$lib/types';
+} from '@hodl-or-fold/shared';
 
 // ── Phase ─────────────────────────────────────────────────────────────────────
 export type Phase = 'idle' | 'guessing' | 'waiting' | 'validating' | 'resolved';

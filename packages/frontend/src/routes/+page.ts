@@ -11,7 +11,7 @@
 // that proxy requests to the Cloudflare Worker, injecting x-api-secret.
 
 import { browser } from '$app/environment';
-import type { PlayerResponse } from '$lib/types';
+import type { PlayerResponse } from '@hodl-or-fold/shared';
 
 export const ssr = false; // localStorage is browser-only
 

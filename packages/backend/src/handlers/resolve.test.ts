@@ -2,7 +2,7 @@
 // Unit tests for guess resolution logic.
 // Covers all cases from spec §9.1 and §9.3.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { tryResolve } from './resolve';
 import type { Env } from '../db/client';
 import type { Guess } from '@hodl-or-fold/shared';

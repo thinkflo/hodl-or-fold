@@ -76,7 +76,7 @@ export async function runPriceFetcher(env: Env): Promise<void> {
         usd: price,
         ts:  new Date().toISOString(),
       });
-      console.log(`[cron] iteration ${i}: $${price}`);
+      // Uncomment for debugging: console.log(`[cron] iteration ${i}: $${price}`);
     } catch (e) {
       console.error(`Price fetch iteration ${i} failed:`, e);
     }
