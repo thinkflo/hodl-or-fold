@@ -21,8 +21,7 @@
   $: if ($price && Math.abs($price - prevPrice) >= MIN_CHANGE) {
     const diff = $price - prevPrice;
 
-    // Tick indicator on every price change during active rounds
-    if (prevPrice !== 0 && $phase !== 'idle') {
+    if (prevPrice !== 0) {
       tickText  = (diff > 0 ? '+' : '–') + '$' + fmt(Math.abs(Math.round(diff * 100) / 100));
       tickClass = diff > 0 ? 'tick-up' : 'tick-down';
       tickKey++;
