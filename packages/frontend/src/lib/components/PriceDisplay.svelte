@@ -38,7 +38,7 @@
   $: priceColor = (() => {
     if ($phase === 'idle' || $phase === 'resolved') return '#fff';
     const diff = dispPrice - $entryPrice;
-    return diff > 1 ? '#00ff88' : diff < -1 ? '#ff4466' : '#fff';
+    return diff >= 0.01 ? '#00ff88' : diff <= -0.01 ? '#ff4466' : '#fff';
   })();
 
   $: priceFilter = ($phase !== 'idle' && $phase !== 'resolved')
