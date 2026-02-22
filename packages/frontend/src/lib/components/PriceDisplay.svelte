@@ -37,12 +37,12 @@
   }
 
   $: priceColor = (() => {
-    if ($phase === 'idle') return '#fff';
+    if ($phase === 'idle' || $phase === 'resolved') return '#fff';
     const diff = dispPrice - $entryPrice;
     return diff > 1 ? '#00ff88' : diff < -1 ? '#ff4466' : '#fff';
   })();
 
-  $: priceFilter = $phase !== 'idle'
+  $: priceFilter = ($phase !== 'idle' && $phase !== 'resolved')
     ? `drop-shadow(0 0 18px ${priceColor}44)`
     : 'none';
 
