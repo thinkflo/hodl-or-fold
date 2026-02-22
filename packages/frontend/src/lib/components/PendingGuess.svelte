@@ -323,7 +323,7 @@
         {#if $phase === 'waiting'}
           <span class="ring-emoji" aria-hidden="true">⏳</span>
         {:else if $phase === 'validating'}
-          <div class="validating-label">Validating…</div>
+          <span class="ring-emoji spin" aria-hidden="true">⏳</span>
         {:else}
           <div class="countdown" style:color={$secondsLeft <= 10 ? '#ff4466' : '#fff'}>
             {$secondsLeft}
@@ -382,9 +382,13 @@
   .ring-emoji {
     font-size: 48px; line-height: 1; user-select: none;
   }
-  .validating-label {
-    font-size: 11px; color: #888; text-align: center;
-    letter-spacing: 0.08em;
+  .ring-emoji.spin {
+    animation: spin-pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes spin-pulse {
+    0%   { transform: rotate(0deg)   scale(1); }
+    50%  { transform: rotate(180deg) scale(0.9); }
+    100% { transform: rotate(360deg) scale(1); }
   }
   .status-right { flex: 1; min-width: 0; }
   .label-micro  { font-size: 9px; color: #444; letter-spacing: 0.2em; margin-bottom: 3px; }
