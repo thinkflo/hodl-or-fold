@@ -222,6 +222,7 @@ async function checkResolution(newPrice: number): Promise<void> {
     finalPrice: data.currentPrice!,
     scoreDelta: data.outcome === 'correct' ? 1 : -1,
   });
+  price.set(data.currentPrice!);
   phase.set('resolved');
 }
 

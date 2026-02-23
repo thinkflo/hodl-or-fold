@@ -71,6 +71,7 @@
   $: if ($phase === 'resolved' && !frozen) {
     frozen = true;
     tween.stop();
+    dispPrice = $livePrice;
   }
 
   function chartColor(): string {
