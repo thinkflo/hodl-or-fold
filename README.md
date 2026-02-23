@@ -1,9 +1,10 @@
 # Hodl or Fold
 
-> Will BTC hold or fold in 60 seconds?
+> Will BTC rise or fall in 60 seconds?
 
-Real-time Bitcoin price prediction game. Players bet HODL (price rises) or FOLD
-(price falls) over a 60-second window. Built on Cloudflare's edge platform.
+Real-time Bitcoin price prediction game. Players call HODL (price goes up) or
+FOLD (price goes down) over a 60-second window. Built on Cloudflare's edge
+platform — Workers, D1, and Pages.
 
 ---
 
@@ -14,20 +15,40 @@ Real-time Bitcoin price prediction game. Players bet HODL (price rises) or FOLD
 npm install -g wrangler
 pnpm install
 
-# Backend
+# Backend — first-time setup
 cd packages/backend
 wrangler login
 wrangler d1 create hodl-or-fold-db          # copy database_id → wrangler.toml
 wrangler d1 execute hodl-or-fold-db --file=src/db/migrations/001_initial.sql
 wrangler d1 execute hodl-or-fold-db --file=src/db/migrations/002_price_feed.sql
-wrangler secret put API_SECRET              # openssl rand -hex 32
+wrangler secret put API_SECRET              # e.g. openssl rand -hex 32
 wrangler secret put MAX_PLAYERS             # e.g. 100
-wrangler dev                                # local Worker + miniflare
+
+# Local dev — apply migrations to local D1
+wrangler d1 execute hodl-or-fold-db --local --file=src/db/migrations/001_initial.sql
+wrangler d1 execute hodl-or-fold-db --local --file=src/db/migrations/002_price_feed.sql
+
+# Run backend locally
+wrangler dev
+# Note: cron does not run in wrangler dev. The first /price or /price/stream
+# request triggers a one-off fetch so you see a BTC price without seeding.
 
 # Frontend (separate terminal)
 cd packages/frontend
+cp .env.example .env                        # set WORKER_URL and API_SECRET
 pnpm dev
 ```
+
+### Local dev environment
+
+The frontend reads `WORKER_URL` and `API_SECRET` from `.env` (or `.env.local`).
+The backend reads secrets from `.dev.vars` (same directory as `wrangler.toml`).
+See `.env.example` and `.dev.vars.example` for both setups:
+
+- **Local frontend + remote backend** — point `WORKER_URL` at the deployed Worker
+- **Local frontend + local backend** — point `WORKER_URL` at `http://127.0.0.1:8787`
+
+Both `.env` and `.dev.vars` are gitignored; the `.example` files are committed.
 
 ---
 
@@ -49,7 +70,7 @@ hodl-or-fold/
 │   │       │   ├── guesses.ts      # POST /guesses, GET /guesses/:id
 │   │       │   └── resolve.ts      # two-condition resolution logic
 │   │       ├── cron/
-│   │       │   └── priceFetcher.ts # 60-iteration cron loop → D1 price_feed
+│   │       │   └── priceFetcher.ts # 30-iteration cron loop → D1 price_feed
 │   │       └── db/
 │   │           ├── client.ts       # Env type definition
 │   │           ├── price.ts        # get/set price from D1
@@ -67,10 +88,9 @@ hodl-or-fold/
 │               ├── components/
 │               │   ├── PriceDisplay.svelte
 │               │   ├── PendingGuess.svelte
-│               │   ├── GuessButtons.svelte
 │               │   └── CapacityScreen.svelte
 │               └── utils/
-│                   ├── priceAnimation.ts  # tween, FLIP, chart renderer
+│                   ├── priceAnimation.ts  # tween, FLIP, canvas chart
 │                   └── proxy.ts           # Worker proxy helper
 └── packages/shared/
 ```
@@ -84,12 +104,15 @@ hodl-or-fold/
 The browser never contacts the Worker directly. All requests go through SvelteKit
 server routes which inject `x-api-secret` from a Pages environment variable.
 
-**Price feed** (spec §5):
-- Cron fires every minute, loops 60 × 1s internally → writes to D1 `price_feed` table
-- SSE stream (`GET /price/stream`) reads D1 every second, pushes to all clients (strong consistency)
+**Price feed:**
+- Cron fires every minute; loops 30 iterations × 2s internally → writes to D1 `price_feed` table
+- Price sources: Kraken → Binance → CoinGecko (tried in order; first success wins)
+- SSE stream (`GET /price/stream`) reads D1 every 2s, pushes to all clients
+- D1 gives read-after-write consistency so clients see updates within ~2s
 - Client subscribes via `EventSource` which auto-reconnects on drop
+- In local dev (no cron), the first `/price` or `/price/stream` request triggers a one-off fetch
 
-**Resolution** (spec §5.7 — two conditions, both required):
+**Resolution** (two conditions, both required):
 1. ≥ 60 seconds elapsed since `guessed_at`
 2. Current D1 price ≠ `price_at_guess`
 
@@ -97,20 +120,31 @@ The client triggers a `GET /guesses/:id` call when its local timer expires AND
 the SSE price has moved. The server independently re-validates both conditions
 and is the sole authority on the outcome.
 
+**Game phases:**
+- `idle` — live BTC price, HODL/FOLD buttons
+- `guessing` — 60s countdown, live chart, entry card
+- `validating` — timer done + price moved, waiting for server response
+- `waiting` — timer done but price hasn't moved yet (hourglass)
+- `resolved` — win/loss result, PLAY AGAIN
+
+**Session persistence:** Browser stores a UUID in localStorage. On reload,
+`GET /players/:id` restores score and any pending guess (including `guessed_at`
+timestamp so the countdown resumes accurately).
+
 ---
 
 ## Spec conformance
 
 | Requirement | Implementation |
 |---|---|
-| Server-side entry price lock | `POST /guesses` reads KV at submission time |
+| Server-side entry price lock | `POST /guesses` reads D1 `price_feed` at submission time |
 | Two-condition resolution | `resolve.ts` — timer + price movement, both required |
 | Indefinite wait if price frozen | `awaiting_price_change` reason, no timeout |
 | Session persistence | localStorage UUID + D1 upsert + `GET /players/:id` restore |
 | Capacity limit (100 users) | `POST /players` rejects 101st active player with 503 |
 | Secret never in browser | SvelteKit proxy injects `x-api-secret` server-side |
-| D1/KV never public | Worker bindings only — no public endpoints |
-| Price from KV only at resolution | `resolve.ts` reads KV; never calls Binance/CoinGecko |
+| D1 never public | Worker bindings only — no public endpoints |
+| Price from D1 only at resolution | `resolve.ts` reads D1; never calls external APIs |
 | Idempotent resolution | Already-resolved guess returns existing outcome |
 
 ---
@@ -118,21 +152,30 @@ and is the sole authority on the outcome.
 ## Deploy
 
 ```bash
-cd packages/backend  && wrangler deploy
-cd packages/frontend && wrangler pages deploy .svelte-kit/cloudflare
+# Backend (Worker)
+pnpm deploy:backend
+
+# Frontend (Pages) — preview deploy (main branch alias)
+pnpm deploy:frontend
+
+# Frontend (Pages) — production deploy (hodl-or-fold.pages.dev)
+cd packages/frontend && pnpm deploy:prod
 ```
 
 Set these in the Cloudflare Pages dashboard (Settings → Environment Variables):
 - `WORKER_URL` — deployed Worker URL (e.g. `https://hodl-or-fold-api.workers.dev`)
-- `API_SECRET`  — must match the secret set in the Worker
+- `API_SECRET` — must match the secret set in the Worker
+
+For production deploys via CLI, the Pages project must have its **Production branch**
+set to `production` in the Cloudflare dashboard.
 
 ---
 
 ## Tests
 
 ```bash
-cd packages/backend && pnpm test
+pnpm test
 ```
 
-Covers all resolution cases from spec §9.1: timer, awaiting_price_change,
-price_unavailable, correct/wrong for each direction, idempotency.
+Covers all resolution cases: timer, awaiting_price_change, price_unavailable,
+correct/wrong for each direction, idempotency.
