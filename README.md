@@ -52,6 +52,10 @@ See `.env.example` and `.dev.vars.example` for both setups:
 
 Both `.env` and `.dev.vars` are gitignored; the `.example` files are committed.
 
+> **Note:** The cron-based BTC price feed cannot be replicated locally. When
+> testing the frontend locally, point `WORKER_URL` at the live deployed Worker
+> so the price feed and SSE stream work correctly.
+
 ---
 
 ## Structure
@@ -109,7 +113,7 @@ server routes which inject `x-api-secret` from a Pages environment variable.
 **Price feed:**
 - Cron fires every minute; loops 30 iterations × 2s internally → writes to D1 `price_feed` table
 - Price sources: Kraken → Binance → CoinGecko (tried in order; first success wins)
-- SSE stream (`GET /price/stream`) reads D1 every 2s, pushes to all clients
+- SSE stream (`GET /price/stream`) reads D1 every 2s, broadcasts to all connected clients
 - D1 gives read-after-write consistency so clients see updates within ~2s
 - Client subscribes via `EventSource` which auto-reconnects on drop
 - In local dev (no cron), the first `/price` or `/price/stream` request triggers a one-off fetch
@@ -125,12 +129,11 @@ and is the sole authority on the outcome.
 **Game phases:**
 - `idle` — live BTC price, HODL/FOLD buttons
 - `guessing` — 60s countdown, live chart, entry card
-- `validating` — timer done + price moved, waiting for server response
 - `waiting` — timer done but price hasn't moved yet (hourglass)
 - `resolved` — win/loss result, PLAY AGAIN
 
 **Session persistence:** Browser stores a UUID in localStorage. On reload,
-`GET /players/:id` restores score and any pending guess (including `guessed_at`
+`POST /players` restores score and any pending guess (including `guessed_at`
 timestamp so the countdown resumes accurately).
 
 ---
@@ -142,7 +145,7 @@ timestamp so the countdown resumes accurately).
 | Server-side entry price lock | `POST /guesses` reads D1 `price_feed` at submission time |
 | Two-condition resolution | `resolve.ts` — timer + price movement, both required |
 | Indefinite wait if price frozen | `awaiting_price_change` reason, no timeout |
-| Session persistence | localStorage UUID + D1 upsert + `GET /players/:id` restore |
+| Session persistence | localStorage UUID + D1 upsert + `POST /players` restore |
 | Capacity limit (100 users) | `POST /players` rejects 101st active player with 503 |
 | Secret never in browser | SvelteKit proxy injects `x-api-secret` server-side |
 | D1 never public | Worker bindings only — no public endpoints |
@@ -168,8 +171,34 @@ Set these in the Cloudflare Pages dashboard (Settings → Environment Variables)
 - `WORKER_URL` — deployed Worker URL (e.g. `https://hodl-or-fold-api.workers.dev`)
 - `API_SECRET` — must match the secret set in the Worker
 
-For production deploys via CLI, the Pages project must have its **Production branch**
-set to `production` in the Cloudflare dashboard.
+---
+
+## AWS migration path
+
+This project uses Cloudflare Workers, D1, and Pages in place of the AWS stack
+suggested in the brief. The decision was made on cost and simplicity grounds —
+the architecture is equivalent in capability and effectively free at evaluation
+scale.
+
+The migration path to AWS is straightforward:
+
+| Cloudflare | AWS equivalent |
+|---|---|
+| Workers | Lambda + API Gateway |
+| D1 (SQLite) | RDS PostgreSQL (schema ports directly) |
+| Pages | S3 + CloudFront |
+| Cron Trigger | EventBridge Scheduled Rule → Lambda |
+| SSE stream | API Gateway HTTP APIs (native SSE support) |
+
+The D1 SQLite schema requires no changes to run on RDS PostgreSQL — all queries
+use standard SQL with no SQLite-specific syntax. The Worker handlers port
+directly to Lambda with an Express or Hono wrapper. The SvelteKit frontend
+deploys to S3/CloudFront unchanged.
+
+The primary operational difference is cost: the equivalent AWS architecture
+(Lambda + RDS t4g.micro + API Gateway + WAF + Secrets Manager + VPC) runs
+approximately $24/month at idle before any traffic, versus effectively $0 on
+Cloudflare at this scale.
 
 ---
 
