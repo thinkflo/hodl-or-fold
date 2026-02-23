@@ -6,6 +6,8 @@ Real-time Bitcoin price prediction game. Players call HODL (price goes up) or
 FOLD (price goes down) over a 60-second window. Built on Cloudflare's edge
 platform — Workers, D1, and Pages.
 
+Live at https://hodl-or-fold.pages.dev
+
 ---
 
 ## Quick start
